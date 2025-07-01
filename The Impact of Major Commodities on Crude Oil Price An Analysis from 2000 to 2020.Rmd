@@ -1,0 +1,485 @@
+---
+title: "The Impact of Major Commodities on Crude Oil Price: An Analysis from 2000 to 2020"
+output: pdf_document
+date: "2025-03-06"
+---
+```{r}
+ library(readr)
+ COMMODITY_PRICE <- read_csv("C:/Users/gabri/OneDrive/Desktop/Applied Linear Model/COMMODITY_PRICE.csv")
+ head(COMMODITY_PRICE)
+```
+The data was taken from the World Bank website.
+The variables in the dataset are:
+- Coal (the cost in USD of coal per ton), 
+- Natural Gas (the cost in USD of natural gas per million British thermal units (MMBtu)),
+- Crude Oil (the cost in USD of crude oil per barrel, this will be the response of the model), 
+- Aluminum (the cost in USD of aluminum per ton), 
+- Gold (the cost in USD of gold per ounce), 
+- Lead (the cost in USD of lead per ton), 
+- Zinc (the cost in USD of zinc per ton),
+- Cocoa (the cost in USD of cocoa per ton), 
+- Coconut Oil (the cost in USD of coconut oil per metric ton), 
+- Wheat (the cost in USD of wheat per ton), 
+- Banana (the cost in USD of banana per kg), 
+- Orange (the cost in USD of orange per Kg) 
+- Shrimps (the cost in USD of orange per kg)
+- Potassium (the cost in USD of potassium per metric ton)
+- Cotton (the cost in USD of cotton per kg)
+- Post Crisis a categorical variable indicating whether an observation is before or
+ after September 2008. I chose September 2008 because it is the month when the financial company Lehman Brothers declared bankruptcy. It is 0 if it’s before September 2008, 1 if it’s after.
+
+# Goal of the Study
+The goal of this study is to understand how some of the major commodities have influenced the price of crude oil from 2000 to 2020. Additionally, I would like to determine whether the 2008 financial crisis had an impact on commodity prices.
+
+# Representation of data
+To better understand how the price of crude oil depends on the other variables, the following graphs will be very helpful. 
+I will create four separate plots: the first one will focus on crude oil and energy related variables, the second will explore crude oil and metals, and the third and fourth will examine crude oil and the remaining commodities.
+```{r, echo=FALSE, fig.height=2.5}
+plot(COMMODITY_PRICE[, c("Coal", "Natural_Gas", "Crude_Oil"), pch = 19, cex = 0.7])
+```
+```{r, echo=FALSE, fig.height=3.5}
+plot(COMMODITY_PRICE[, c("Aluminum", "Lead", "Zinc", "Gold", "Crude_Oil"), pch = 19, cex = 0.7])
+plot(COMMODITY_PRICE[, c("Cocoa", "Coconut_Oil", "Wheat", "Banana", "Crude_Oil"), pch = 19, cex = 0.7])
+plot(COMMODITY_PRICE[, c("Orange", "Shrimps", "Cotton", "Potassium", "Crude_Oil"), pch = 19, cex = 0.7])
+```
+As expected crude oil has a more linear relationship with other energy commodities compared to other types, as they share common price drivers such as energy demand, geopolitics, and substitutability between sources.
+It would be also interesting to see how the price of oil changed before and after the 2008 crisis.
+```{r, echo=FALSE, fig.height=3}
+ boxplot(Crude_Oil ~ Post_Crisis, data = COMMODITY_PRICE)
+```
+ It can be observed that the median crude oil prices are visibly higher in the post-crisis period compared to the pre-crisis period. This indicates an overall increase in prices after the crisis.
+Before fitting the model, it is useful to center all the covariates in order to better interpret the model’s intercept.
+```{r, echo=FALSE}
+COMMODITY_PRICE$Coal = COMMODITY_PRICE$Coal - mean(COMMODITY_PRICE$Coal)
+COMMODITY_PRICE$Natural_Gas = COMMODITY_PRICE$Natural_Gas - mean(COMMODITY_PRICE$Natural_Gas)
+COMMODITY_PRICE$Cocoa = COMMODITY_PRICE$Cocoa - mean(COMMODITY_PRICE$Cocoa)
+COMMODITY_PRICE$Coconut_Oil = COMMODITY_PRICE$Coconut_Oil - mean(COMMODITY_PRICE$Coconut_Oil)
+COMMODITY_PRICE$Wheat = COMMODITY_PRICE$Wheat - mean(COMMODITY_PRICE$Wheat)
+COMMODITY_PRICE$Banana = COMMODITY_PRICE$Banana - mean(COMMODITY_PRICE$Banana)
+COMMODITY_PRICE$Orange = COMMODITY_PRICE$Orange - mean(COMMODITY_PRICE$Orange)
+COMMODITY_PRICE$Shrimps = COMMODITY_PRICE$Shrimps - mean(COMMODITY_PRICE$Shrimps)
+COMMODITY_PRICE$Cotton = COMMODITY_PRICE$Cotton - mean(COMMODITY_PRICE$Cotton)
+COMMODITY_PRICE$Potassium = COMMODITY_PRICE$Potassium - mean(COMMODITY_PRICE$Potassium)
+COMMODITY_PRICE$Aluminum = COMMODITY_PRICE$Aluminum - mean(COMMODITY_PRICE$Aluminum)
+COMMODITY_PRICE$Lead = COMMODITY_PRICE$Lead - mean(COMMODITY_PRICE$Lead)
+COMMODITY_PRICE$Zinc = COMMODITY_PRICE$Zinc - mean(COMMODITY_PRICE$Zinc)
+COMMODITY_PRICE$Gold = COMMODITY_PRICE$Gold - mean(COMMODITY_PRICE$Gold)
+```
+
+# Variable selection
+Based on the previous scatterplots, I observed that the response variable, crude oil, might have a quadratic relationship with potassium and cotton. Let's perform variable selection using best subset selection, forward selection and backward selection
+```{r}
+library(leaps)
+Best_Subset_Selection = regsubsets(log(Crude_Oil) ~ Coal + Natural_Gas + Cocoa 
+                                   + Coconut_Oil+ Wheat + Banana + Orange 
+                                   + Shrimps + Cotton + I(Cotton^2) + Potassium 
+                                   + I(Potassium^2) + Lead + Zinc 
+                                   + Gold+ Post_Crisis + Gold * Post_Crisis, 
+                                   data = COMMODITY_PRICE, nvmax = 18)
+summ = summary(Best_Subset_Selection)
+Backward_Selection = regsubsets(Crude_Oil ~ Coal + Natural_Gas + Cocoa + Coconut_Oil + Wheat +
+                        Banana + Orange + Shrimps + Cotton + I(Cotton^2) + Potassium +
+                        I(Potassium^2) + Aluminum + Lead + Zinc + Gold + Post_Crisis +
+                        Gold * Post_Crisis, data = COMMODITY_PRICE, nvmax = 18,
+                      method = "backward")
+summ_backward = summary(Backward_Selection)
+Forward_Selection = regsubsets(Crude_Oil ~ Coal + Natural_Gas + Cocoa + Coconut_Oil + Wheat
+                         + Banana + Orange + Shrimps + Cotton + I(Cotton^2) + Potassium +
+                           I(Potassium^2) + Aluminum + Lead + Zinc + Gold + Post_Crisis +
+                           Gold * Post_Crisis, data = COMMODITY_PRICE, nvmax = 18,
+                         method = "forward")
+summ_forward = summary(Forward_Selection)
+```
+```{r, fig.height=3.5}
+plot(Best_Subset_Selection, scale = "Cp")
+n = nrow(COMMODITY_PRICE)
+RSS = Best_Subset_Selection$rss[-1]
+AIC_Best = c(0)
+for (i in 1:length(RSS)){
+  AIC_Best[i] = n*log(RSS[i]/n) + 2*(i + 2)
+
+} 
+RSS = Best_Subset_Selection$rss[-1]
+BIC_Best = c(0)
+for (i in 1:length(RSS)){
+  BIC_Best[i] = n*log(RSS[i]/n) + log(n)*(i + 2)
+} 
+```
+I find in the same way the AIC and BIC for Backward and Forward.
+```{r, echo=FALSE}
+RSS = Forward_Selection$rss[-1]
+AIC_Forward = c(0)
+for (i in 1:length(RSS)){
+  AIC_Forward[i] = n*log(RSS[i]/n) + 2*(i + 2)
+} 
+RSS = Backward_Selection$rss[-1]
+AIC_Backward = c(0)
+for (i in 1:length(RSS)){
+  AIC_Backward[i] = n*log(RSS[i]/n) + 2*(i + 2)
+} 
+RSS = Forward_Selection$rss[-1]
+BIC_Forward = c(0)
+for (i in 1:length(RSS)){
+  BIC_Forward[i] = n*log(RSS[i]/n) + log(n)*(i + 2)
+} 
+RSS = Backward_Selection$rss[-1]
+BIC_Backward = c(0)
+for (i in 1:length(RSS)){
+  BIC_Backward[i] = n*log(RSS[i]/n) + log(n)*(i + 2)
+} 
+```
+```{r, fig.height=3.8, echo=FALSE}
+par(mfrow = c(1, 3))
+plot(summ$adjr2, type = "b", col = "red")
+lines(summ_backward$adjr2, type = "b", col = "orange")
+lines(summ_forward$adjr2, type = "b", col = "green")
+legend("bottomright", 
+       legend = c("Best Subset", "Forward", "Backward"), 
+       col = c("red", "green", "orange"), 
+       lty = 1, pch = 19)
+plot(BIC_Best, type = "b", col = "red") 
+lines(BIC_Forward, type = "b", col = "green")
+lines(BIC_Backward, type = "b",  col = "orange")
+legend("topright", 
+       legend = c("Best Subset", "Forward", "Backward"), 
+       col = c("red", "green", "orange"), 
+       lty = 1, pch = 19)
+plot(AIC_Best, type = "b", col = "red")
+lines(AIC_Forward, type = "b", col = "green")
+lines(AIC_Backward, type = "b", col = "orange")
+legend("topright", 
+       legend = c("Best Subset", "Forward", "Backward"), 
+       col = c("red", "green", "orange"), 
+       lty = 1, pch = 19)
+```
+```{r, fig.height=3}
+p = 18
+k = nrow(COMMODITY_PRICE)
+folds = sample (1:k,nrow(COMMODITY_PRICE),replace = FALSE)
+cv.errors <- matrix (NA ,k, p, dimnames =list(NULL , paste (1:p) ))
+for(j in 1:k){
+  ols_best = regsubsets(Crude_Oil ~ Coal + Natural_Gas + Cocoa + Coconut_Oil 
+                        + Wheat + Banana + Orange + Shrimps + Cotton 
+                        + I(Cotton^2) + Potassium + I(Potassium^2) + Aluminum 
+                        + Lead + Zinc + Gold + Post_Crisis 
+                        + Gold * Post_Crisis, 
+                        data = COMMODITY_PRICE[folds !=j,], nvmax = 18)
+  for(i in 1:p) {
+    mat <- model.matrix(as.formula(ols_best$call[[2]]), COMMODITY_PRICE[folds==j,])
+    coefi <- coef(ols_best ,id = i)
+    xvars <- names(coefi )
+    pred <- mat[,xvars ]%*% coefi
+    cv.errors[j,i] <- mean((COMMODITY_PRICE$Crude_Oil[folds==j] - pred)^2)
+  }
+}
+cv.mean = colMeans(cv.errors)
+cv.mean
+plot(cv.mean ,type="b",pch=19,
+     xlab="Number of predictors",
+     ylab="CV error")
+```
+I'll use also the Lasso to do variable selection.
+```{r, results='hide', warning=FALSE}
+library(glmnet)
+```
+```{r, fig.height=2.7}
+X = model.matrix(Crude_Oil ~ . + I(Cotton^2) + I(Potassium^2) 
+                 + Gold * Post_Crisis, data = COMMODITY_PRICE[, -1])[, -1]
+y = COMMODITY_PRICE$Crude_Oil
+set.seed(1)
+grid = 10^seq(8, -4, length=100)
+cv.lasso = cv.glmnet(x = X, y = y, alpha = 1, nfold = 10, lambda = grid)
+lambda_min = cv.lasso$lambda.min
+lambda_1se = cv.lasso$lambda.1se
+lambda_min
+lambda_1se
+predict(cv.lasso, type = "coefficients", s = lambda_min)
+```
+As we can see both the minimum lambda and the lambda + 1 standard deviation are very close to 0, so it is a very similar model to least squares. Furthermore, even if the model recommended by Lasso regression is the full model, looking at the BIC, AIC, Cp and adj R^2, we notice that in reality there are other models that are about as good as the full model but are also a bit simpler, consequently I consider as the best model (also taking into account the hierarchical principle) the one with 15 predictors, all predictors except aluminum, orange and wheat.
+
+# Collinearity
+```{r}
+Best_Model = glm(Crude_Oil ~ Coal + Natural_Gas + Cocoa + Coconut_Oil 
+                 + Banana + Shrimps + Cotton + I(Cotton^2) + Potassium 
+                 + I(Potassium^2) + Lead + Zinc + Gold + Post_Crisis 
+                 + Gold * Post_Crisis, data = COMMODITY_PRICE)
+library(car)
+vif(Best_Model)
+```
+There is no collinearity problem.
+
+# Diagnostics
+```{r, fig.height=3, echo=FALSE}
+par(mfrow = c(1, 3)) 
+plot(Best_Model$fitted.values, Best_Model$residuals,
+ xlab = "Fitted values",
+ ylab = "Residuals",
+ main = "Residuals vs Fitted")
+ abline(h = 0, col = "blue", lty = 2)
+resLine = smooth.spline(x = fitted(Best_Model), y = residuals(Best_Model))
+lines(resLine, col = "red")
+qqnorm(residuals(Best_Model), ylab = "Residuals")
+qqline(residuals(Best_Model))
+plot(COMMODITY_PRICE$Month,Best_Model$residuals,
+ type="l",
+ xlab="Time",
+ ylab="Residuals",
+ main="ResidualsvsTime")
+```
+```{r}
+shapiro.test(residuals(Best_Model))
+```
+We have a problem with non constant variance and also with linearity so a transformation of the response could help.
+Despite the variance not being constant, I believe it is not reasonable to use
+Weighted Least Squares since there is no suitable variable to be used as a weight.
+We reject H0 with the Shapiro test, that means we reject the assumption of normality, and if we look at the Q-Q plot we can see that there is some skewness. Since we have skewness a solution could be a transformation of the response variable, such as a logarithmic transformation.
+The errors are a bit correlated since I'm using time series.
+Check High leverage points, outliers and influential points.
+```{r, fig.height=3, fig.width=7.5}
+par(mfrow = c(1, 2))
+rsta = rstandard(Best_Model)
+infl = influence(Best_Model)
+leverage = infl$hat
+plot(leverage, rsta)
+threshold = (17 + 1)*2/nrow(COMMODITY_PRICE)
+abline(v = threshold, col = 2)
+high_leverage_points = which(leverage > threshold)
+text(leverage[high_leverage_points], rsta[high_leverage_points],
+     labels = high_leverage_points, pos = 2, col = "blue", cex = 0.8)
+abline(h=3,col=3)
+abline(h=-3,col=3)
+outliers = which(rsta > 3 | rsta < -3)
+text(leverage[outliers], rsta[outliers], labels = outliers, 
+     pos = 2, col = "red", cex = 0.8)
+
+cook = cooks.distance(Best_Model)
+plot(cook)
+abline(h = 0.5)
+abline(h = 1)
+```
+The red points are the outliers, the blue ones are the high leverage points.
+There are not influential points.
+Let's try do understand more about these high leverage points and outliers.
+```{r, fig.height=3, fig.width=7, echo=FALSE}
+COMMODITY_PRICE$Month <- as.Date(COMMODITY_PRICE$Month)
+plot(COMMODITY_PRICE$Month, COMMODITY_PRICE$Crude_Oil, type = "l", col = "lightcoral",
+     xlab = "Time", ylab = "Crude Oil Price", main = "High Leverage Points & Outliers in Commodity Prices Over Time")
+points(COMMODITY_PRICE$Month[high_leverage_points], COMMODITY_PRICE$Crude_Oil[high_leverage_points], 
+       col = "blue", pch = 19, cex = 1.5)
+points(COMMODITY_PRICE$Month[outliers], COMMODITY_PRICE$Crude_Oil[outliers], 
+       col = "red", pch = 19, cex = 1.5)
+abline(v = as.Date("2008-09-01"), col = "black", lty = 2, lwd = 2)
+lines(COMMODITY_PRICE$Month[high_leverage_points], COMMODITY_PRICE$Crude_Oil[high_leverage_points], 
+      col = "blue", lwd = 2)
+lines(COMMODITY_PRICE$Month[outliers], COMMODITY_PRICE$Crude_Oil[outliers], 
+      col = "red", lwd = 2)
+first_high_leverage_index <- min(high_leverage_points)  
+first_high_leverage_data <- COMMODITY_PRICE[first_high_leverage_index, ]
+legend("topleft", legend = c("Outliers", "High Leverage Points", "Lehman Collapse"),
+       col = c("red", "blue", "black"), pch = c(19, 19, NA), 
+       lty = c(1, 1, 2), lwd = c(1, 2, 2), cex = 0.8)
+```
+The high leverage points in the dataset correspond to the period between 2008 and 2012, which correspond with the global financial crisis. These points do not represent measurement errors or anomalies in the data but rather reflect a historical event that had extreme impacts on the global economy and, consequently, on commodity prices.
+A similar reasoning applies to the outliers:
+Between June 2014 and January 2015, the price of crude oil fall by over 50%, dropping from approximately 115 USD per barrel (June 2014) to around 46 USD per barrel (January 2015). The key cause is the excess supply, by 2014, the United States had surpassed Saudi Arabia and Russia to become the world's largest oil producer. Furthermore in November 2014, OPEC (Organization of the Petroleum Exporting Countries), in particular, Saudi Arabia and Gulf countries, refused to cut oil production.
+April 2020 COVID-19 Shock: Global lockdowns led to an unprecedented demand collapse, causing historic price drops.
+Therefore, the only modification I will make is the logarithmic transformation of the model's response variable.
+If we do again the variable selection, the best model will be the one with all predictors except Wheat.
+```{r}
+Best_Model = glm(log(Crude_Oil) ~ Coal + Natural_Gas + Cocoa + Coconut_Oil 
+                 + Banana + Shrimps + Cotton + I(Cotton^2) + Potassium 
+                 + I(Potassium^2) + Orange + Lead + Zinc + Gold + Post_Crisis 
+                 + Gold * Post_Crisis, data = COMMODITY_PRICE)
+```
+I'll delete also Aluminum to avoid collinearity.
+After rechecking the outliers and high leverage points, they are still linked to the 2008 crisis and 2020, while the 2015 period is better explained by the new model.
+Let's see the Q-Q plot and the Fitted values vs Residuals plot.
+```{r, echo=FALSE, fig.height=3}
+qqnorm(residuals(Best_Model), ylab = "Residuals")
+qqline(residuals(Best_Model))
+plot(Best_Model$fitted.values, Best_Model$residuals,
+ xlab = "Fitted values",
+ ylab = "Residuals",
+ main = "Residuals vs Fitted")
+ abline(h = 0, col = "blue", lty = 2)
+ resLine = smooth.spline(x = fitted(Best_Model), y = residuals(Best_Model))
+ lines(resLine, col = "red")
+```
+As we can see the normality assumption is correct because just one point is far from the line. This transformation has also improved the linearity. The non constant variance problem remains but it is slightly better.
+
+#  Interpretation of parameters
+```{r}
+summ = summary(Best_Model)
+summ
+```
+**Intercept = 4.148**. When all other variables are at their mean values, the expected value of the natural logarithm of the crude oil price is 4.148.
+This implies that the expected crude oil price is approximately exp(4.148) = 63.3 USD per barrel. The small standard error (0.08735) suggests a reliable estimate. The p-value (< 2e-16) indicates that the intercept is highly statistically significant.
+**Beta.Coal = 1.750e-03**. An increase of 1 USD per ton above the mean in the price of coal results in an average increase of 0.00175 in the natural logarithm of the price of crude oil, keeping all other variables at their mean. The small standard error (0.0008676) suggests a reliable estimate. The p-value (0.044812) indicates that the effect is statistically significant (p < 0.05).
+**Beta.Natural_Gas = 5.110e-02**. An increase of 1 USD per million British thermal units (MMBtu) above the mean in the price of natural gas results in an average increase of 0.0511 in the natural logarithm of the price of crude oil, keeping all other variables at their mean. The small standard error (0.007526) suggests a reliable estimate. The p-value (9.5e-11) indicates that the effect is highly statistically significant (p < 0.001).
+**Beta.Cocoa = 9.801e-05**. An increase of 1 thousand USD per ton above the mean in the price of cocoa results in an average increase of 0.00009801 in the natural logarithm of the price of crude oil, keeping all other variables at their mean. The small standard error (0.000035) suggests a reliable estimate. The p-value (0.005542) indicates that the effect is highly statistically significant (p < 0.01).
+**Beta.Coconut_Oil = -1.938e-04**. An increase of 1 USD per metric ton above the mean in the price of coconut oil results in an average decrease of -0.0001938 in the natural logarithm of the price of crude oil, keeping all other variables at their mean. The small standard error (0.00004683) suggests a reliable estimate. The p-value (4.92e-05) indicates that the effect is statistically significant (p < 0.01).
+**Beta.Banana = 3.490e-01**. An increase of 1 USD per kilogram above the mean in the price of bananas results in an average increase of 0.349 in the natural logarithm of the price of crude oil, keeping all other variables at their mean.The small standard error (0.07986) suggests a reliable estimate.The p-value (1.89e-05) indicates that the effect is statistically significant (p < 0.001).
+**Beta.Orange = 1.842e-01**. An increase of 1 USD per kilogram above the mean in the price of oranges results in an average increase of 0.1842 in the natural logarithm of the price of crude oil, keeping all other variables at their mean. The small standard error (0.06899) suggests a reliable estimate. The p-value (0.008122) indicates that the effect is statistically significant (p < 0.01).
+**Beta.Shrimps = 1.843e-02**. An increase of 1 USD per kilogram above the mean in the price of shrimps results in an average increase of 0.01843 in the natural logarithm of the price of crude oil, keeping all other variables at their mean. The small standard error (0.005301) suggests a reliable estimate. The p-value (0.000608) indicates that the effect is statistically significant (p < 0.001).
+**Beta.Cotton = 2.809e-01**. An increase of 1 USD per kilogram above the mean in the price of cotton results in an average increase of 0.2809 in the natural logarithm of the price of crude oil, keeping all other variables at their mean. The small standard error (0.05440) suggests a reliable estimate. The p-value (5.27e-07) indicates that the effect is statistically significant (p < 0.001).
+**Beta.Cotton^2 = -7.495e-02**. The negative parameter for the quadratic relationship between crude oil and cotton suggests that as the price of cotton increases, its positive effect on crude oil prices diminishes. The small standard error (0.01721) suggests a reliable estimate. The p-value (2.01e-05) indicates that the effect is statistically significant (p < 0.001).
+**Beta.Potassium =  1.145e-03**. An increase of 1 USD per metric ton above the mean in the price of potassium results in an average increase of 0.001145 in the natural logarithm of the price of crude oil, keeping all other variables at their mean. The small standard error (0.0003650) suggests a reliable estimate. The p-value (0.001926) indicates that the effect is statistically significant (p < 0.01).
+**Beta.Potassium^2 = -2.780e-06**. he negative parameter for the quadratic relationship between crude oil and potassium suggests that as the price of potassium increases, its positive effect on crude oil prices diminishes. The small standard error (1.022e-06) suggests a reliable estimate. The p-value (0.007036) indicates that the effect is statistically significant (p < 0.01).
+**Beta.Zinc = 1.275e-04**. An increase of 1 USD per ton above the mean in the price of zinc results in an average increase of 0.0001275 in the natural logarithm of the price of crude oil, keeping all other variables at their mean. The small standard error (0.00002466) suggests a reliable estimate. The p-value (5.06e-07) indicates that the effect is highly statistically significant (p < 0.001).
+**Beta.Lead = 7.495e-05**. An increase of 1 USD per ton above the mean in the price of lead results in an average increase of 0.00007495 in the natural logarithm of the price of crude oil, keeping all other variables at their mean. The standard error (0.00003924) is quite big. The p-value (0.057399) indicates that the effect is not statistically significant.
+**Beta.Gold = -1.719e-04**. An increase of 1 USD per ounce above the mean in the price of gold, before the 2008 crisis, resulted in an average decrease of 0.0001719 in the natural logarithm of the price of crude oil, keeping all other variables at their mean. The standard error (0.0002266) is quite big. The p-value (0.448853) indicates that the effect is not statistically significant.
+**Beta.Post_Crisis = -2.438e-01**. The parameter associated with the qualitative variable Post_Crisis indicates that, on average, the log-price of crude oil is 0.2438 lower after the 2008 financial crisis compared to before the crisis, keeping all other variables at their mean. The small standard error (0.07727) suggests a reliable estimate. The p-value (0.001816) indicates that the effect is statistically significant (p < 0.01).
+**Beta.Gold:Post_Crisis = 4.192e-04**. The parameter associated with the interaction between Gold and Post_Crisis indicates that the effect of gold prices on crude oil prices changed after the 2008 financial crisis. Specifically, if the price of an ounce of gold increases by 1 USD during the post-crisis period, the natural logarithm of crude oil prices increases by Beta_Gold + Beta_Gold*Post_Crisis = (- 0.0001719 + 0.0004192). The standard error (0.0002330) is quite big. The p-value (0.073237) indicates that the effect is not statistically significant.
+In order to visualize the effect, of for instance Natural Gas, we can use the following graph.
+```{r, results='hide', warning=FALSE}
+library(effects)
+```
+```{r, fig.height=3}
+plot(predictorEffects(Best_Model, ~ Natural_Gas),
+     xlab = "Natural Gas Price (USD/MMBtu)",
+     ylab = "Log Crude Oil Price")
+```
+This graph shows that the expected effect of a higher Natural Gas Price is an increase in Crude Oil Price (log-transformed). The shaded area represents a 95% pointwise confidence interval for the fitted values.
+
+# Inferences about regression coefficients 
+```{r}
+p = 16  
+t_Coal = summ$coefficients["Coal", "t value"]
+p_value_Coal = 2 * (1 - pt(abs(t_Coal), df = n - p - 1))
+p_value_Coal
+```
+```{r, echo=FALSE, results='hide'}
+t_Natural_Gas = summ$coefficients["Natural_Gas", "t value"]
+p_value_Natural_Gas = 2 * (1 - pt(abs(t_Natural_Gas), df = n - p - 1))
+p_value_Natural_Gas
+
+t_Cocoa = summ$coefficients["Cocoa", "t value"]
+p_value_Cocoa = 2 * (1 - pt(abs(t_Cocoa), df = n - p - 1))
+p_value_Cocoa
+
+t_Coconut_Oil = summ$coefficients["Coconut_Oil", "t value"]
+p_value_Coconut_Oil = 2 * (1 - pt(abs(t_Coconut_Oil), df = n - p - 1))
+p_value_Coconut_Oil
+
+t_Banana = summ$coefficients["Banana", "t value"]
+p_value_Banana = 2 * (1 - pt(abs(t_Banana), df = n - p - 1))
+p_value_Banana
+
+t_Orange = summ$coefficients["Orange", "t value"]
+p_value_Orange = 2 * (1 - pt(abs(t_Orange), df = n - p - 1))
+p_value_Orange
+
+t_Shrimps = summ$coefficients["Shrimps", "t value"]
+p_value_Shrimps = 2 * (1 - pt(abs(t_Shrimps), df = n - p - 1))
+p_value_Shrimps
+
+t_Cotton = summ$coefficients["Cotton", "t value"]
+p_value_Cotton = 2 * (1 - pt(abs(t_Cotton), df = n - p - 1))
+p_value_Cotton
+
+t_Cotton_2 = summ$coefficients["I(Cotton^2)", "t value"]
+p_value_Cotton_2 = 2 * (1 - pt(abs(t_Cotton_2), df = n - p - 1))
+p_value_Cotton_2
+
+t_Potassium = summ$coefficients["Potassium", "t value"]
+p_value_Potassium = 2 * (1 - pt(abs(t_Potassium), df = n - p - 1))
+p_value_Potassium
+
+t_Potassium_2 = summ$coefficients["I(Potassium^2)", "t value"]
+p_value_Potassium_2 = 2 * (1 - pt(abs(t_Potassium_2), df = n - p - 1))
+p_value_Potassium_2
+
+t_Zinc = summ$coefficients["Zinc", "t value"]
+p_value_Zinc = 2 * (1 - pt(abs(t_Zinc), df = n - p - 1))
+p_value_Zinc
+
+t_Lead = summ$coefficients["Lead", "t value"]
+p_value_Lead = 2 * (1 - pt(abs(t_Lead), df = n - p - 1))
+p_value_Lead
+
+t_Gold = summ$coefficients["Gold", "t value"]
+p_value_Gold = 2 * (1 - pt(abs(t_Gold), df = n - p - 1))
+p_value_Gold
+
+t_Post_Crisis = summ$coefficients["Post_Crisis", "t value"]
+p_value_Post_Crisis = 2 * (1 - pt(abs(t_Post_Crisis), df = n - p - 1))
+p_value_Post_Crisis
+
+t_Gold_Post_Crisis = summ$coefficients["Gold:Post_Crisis", "t value"]
+p_value_Gold_Post_Crisis = 2 * (1 - pt(abs(t_Gold_Post_Crisis), df = n - p - 1))
+p_value_Gold_Post_Crisis
+```
+As can be seen from the p-values, only the coefficients associated with Lead, Gold, and the interaction term are not significantly different from zero.
+
+#  Just Metals and Energy Commodities?
+Let's compare the Best Model with a model with just metals and energy commodities, since metals and other energy commodities are intuitively the most connected to crude oil. To do so I'll use their deviance. 
+In the Null Hypothesis we state that the additional predictors in Best Model do not significantly improve model fit. That means that by removing them the deviance will not increase significantly. In the Alternative Hypothesis we state the opposite. The difference between the deviances is distributed as Chi-Squared with df_small - df_best degrees of freedom 
+```{r}
+Glm_Small = glm(log(Crude_Oil) ~ Coal + Natural_Gas + Zinc + Lead + Gold + Post_Crisis 
+                + Gold * Post_Crisis, data = COMMODITY_PRICE)
+summ_small = summary(Glm_Small)
+G_dif = summ_small$deviance - summ$deviance
+df_dif = summ_small$df.residual - summ$df.residual
+1 - pchisq(G_dif,df_dif,lower.tail=FALSE)
+```
+As we can see the p-value is less than 0.05 that means that we can reject the Null Hypothesis: also the commodities that are not metals or related to energy are useful to the model fit. 
+
+#  Goodness of fit
+To check how good does the model fit the data I'll use the adj-R^2, since I'm using by default the identity link function and Gaussian family in this glm model. This means that it's equivalent to ordinary least squares (OLS), just formulated as GLM.
+```{r}
+RSS = summ$deviance
+SSy = sum((log(COMMODITY_PRICE$Crude_Oil) - mean(log(COMMODITY_PRICE$Crude_Oil)))^2)
+adj_R_2 = 1 - ((n - 1) / (n - p - 1)) * RSS/SSy
+adj_R_2
+```
+This means that the model explains the 90% of the variability of the response log(price of crude oil).
+
+#  Prediction
+Suppose that we have the following information about the prices of the commodities present in the model:
+Coal = 80.23 USD/ton
+Natural Gas = 11.78 USD/MMBtu
+Cocoa = 2438.84 USD/ton
+Coconut_Oil = 939.47 USD/metric ton
+Banana = 1.02 USD/kg
+Orange = 0.96 USD/kg
+Shrimps = 14.17 USD/kg
+Cotton = 1.99 USD/kg
+Potassium = 395 USD/metric ton
+Zinc = 1910.25 USD/ton
+Lead = 2139.79 USD/ton
+Gold = 1411.46 USD/ounce
+And it is after the Lehman Brothers bankruptcy so Post_Crisis = 1
+(Since I need to subtract the mean of the corresponding commodity from these values, I have reloaded the dataset, which was initially modified to center the variables, in order to retrieve the average prices of each commodity).
+```{r, echo=FALSE, results='hide'}
+COMMODITY_PRICE <- read_csv("C:/Users/gabri/OneDrive/Desktop/Applied Linear Model/COMMODITY_PRICE.csv", show_col_types = FALSE)
+```
+```{r}
+newdata = data.frame(Coal = 67 - mean(COMMODITY_PRICE$Coal), Natural_Gas = 7 - mean(COMMODITY_PRICE$Natural_Gas), Cocoa = 2219 - mean(COMMODITY_PRICE$Cocoa), Coconut_Oil = 926 - mean(COMMODITY_PRICE$Coconut_Oil),
+Banana = 0.95 - mean(COMMODITY_PRICE$Banana), Orange = 0.79 - mean(COMMODITY_PRICE$Orange), Shrimps = 11 - mean(COMMODITY_PRICE$Shrimps), Cotton = 1.5 - mean(COMMODITY_PRICE$Cotton), Lead = 1628 - mean(COMMODITY_PRICE$Lead),
+Potassium = 261 - mean(COMMODITY_PRICE$Potassium), Zinc = 1945 - mean(COMMODITY_PRICE$Zinc), Gold = 952 - mean(COMMODITY_PRICE$Gold), Post_Crisis = 1)
+pred = predict(Best_Model, newdata = newdata, se.fit = TRUE)
+ y_hat = pred$fit
+ se_y_hat = pred$se.fit
+ df = n- p- 1
+ 15
+t_value= qt(0.975,df)
+ lower_bound<-y_hat-t_value *se_y_hat
+ upper_bound<-y_hat + t_value *se_y_hat
+ c(lower_bound,y_hat,upper_bound)
+
+```
+(se.fit = TRUE is used to get the standard error).
+So the predicted price for a barrel of crude oil is exp(3.83) = 46 USD per barrel.
+Let's now simulate n data points from the fitted regression model, assuming the estimated parameters as the true parameters
+```{r, fig.height=3}
+RSS = summ$deviance
+sigma = sqrt(RSS/(n - p - 1))
+set.seed(123)
+n_sim = nrow(COMMODITY_PRICE)
+Y_pred = predict(Best_Model)
+Y_sim = Y_pred + rnorm(n_sim, mean = 0, sd = sigma)
+Y_obs = log(COMMODITY_PRICE$Crude_Oil)
+plot(Y_sim, Y_obs, xlab = "Simulated Response", ylab = "Observed Response")
+abline(0, 1, col="red", lwd=2, lty=2)
+```
+The prediction is accurate, with slight dispersion around the regression, suggesting a good model fit.
